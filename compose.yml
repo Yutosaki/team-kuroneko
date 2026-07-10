@@ -1,0 +1,9 @@
+services:
+  review:
+    build:
+      context: .
+    volumes:
+      - .:/book
+    environment:
+      - REVIEW_CONFIG_FILE=config.yml
+    command: npm run pdf

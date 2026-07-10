@@ -1,0 +1,42 @@
+{
+  "name": "review-template",
+  "version": "0.0.2",
+  "private": true,
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TechBooster/ReVIEW-Template.git"
+  },
+  "author": "TechBooster",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/TechBooster/ReVIEW-Template/issues"
+  },
+  "homepage": "https://github.com/TechBooster/ReVIEW-Template#readme",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.8.0"
+  },
+  "scripts": {
+    "global-bundler": "gem install bundler",
+    "global": "npm run global-bundler",
+    "pdf": "grunt pdf",
+    "md": "grunt markdown",
+    "html": "grunt html",
+    "text": "grunt text",
+    "epub": "grunt epub",
+    "web": "grunt web",
+    "idgxml": "grunt idgxmlmaker",
+    "vivliostyle": "grunt vivliostyle",
+    "test": "npm run html"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "grunt": "^1.6.1",
+    "grunt-cli": "^1.4.3",
+    "grunt-contrib-clean": "^2.0.1",
+    "grunt-shell": "^4.0.0",
+    "js-yaml": "^4.1.0",
+    "load-grunt-tasks": "^5.1.0"
+  }
+}
