@@ -1,1 +1,0 @@
-test|id:INTEGER:0:1,name:STRING:20:0,age:INTEGER:0:1
