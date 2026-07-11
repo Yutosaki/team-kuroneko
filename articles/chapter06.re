@@ -56,8 +56,8 @@ CREATE TABLE orders (
 本章では、これらをParser、Statement、Schema、Catalog、Table、QueryExecutorに分けて実装します。これにより、SQL文字列の解析と、ページファイルに対する読み書きを分離します。
 
 == SQL処理の全体像
-
-最初に、SQLを入力してから結果が表示されるまでの経路を確認します。詳細は後続の節で個別に説明します。
+SQLの解析からデータの読み書きまでを一つの処理にまとめると、各クラスの役割や処理の境界が分かりにくくなります。
+そこで本節では、SQLを入力してから結果を表示するまでの流れを示し、後続の節で実装する各要素の役割を整理します。
 
 //cmd{
 SQL文字列
@@ -99,8 +99,9 @@ executor.execute(statement);
 この時点で、SQL文字列を扱う責務はParser側に限定されます。QueryExecutor以降のクラスは、SQLの空白や括弧の位置ではなく、Statementが保持しているテーブル名、カラム名、値、条件を参照します。
 
 == テーブルの仕様
+任意のカラムを持つテーブルを扱うには、テーブルの定義と実際の行データを、固定の形式に依存せず表現する必要があります。
+この節では、必要な情報をSchema、Column、Row、Table、Catalogに分け、それぞれが一つの役割を担う方針でテーブルの構造を設計します
 
-テーブルをSQLから操作するには、テーブルの構造と行データを別々に表現する必要があります。本章では、Schema、Column、Row、Table、Catalogがそれぞれ異なる情報を担当します。
 
 //cmd{
 Catalog
@@ -247,8 +248,8 @@ users|id:INTEGER:0,name:STRING:20,age:INTEGER:0
 Catalogは起動時にcatalog.txtを読み、SchemaとTableを復元します。ファイルへの保存と起動時の復元による永続化については、第3章「なぜ永続化が必要なのか」と「ファイルへの保存」で説明しています。本章で新しく扱うのは、行データに加えてテーブル定義も永続化する点です。
 
 == ParserによるSQLの構文解析
-
-Parserの役割は、SQL文字列から実行に必要な情報を取り出し、Statementへ変換することです。この変換は、Tokenizerによる字句解析と、SimpleParserによる構文解析の二段階で進みます。
+入力されたSQL文字列のままでは、実行処理がテーブル名や条件を安全に参照できません。
+本節では、SQLをTokenizerでトークンへ分割し、SimpleParserで構文を読み取り、実行に必要な情報をStatementとして表現する方針を採ります。
 
 === Tokenizerによる字句解析
 
@@ -624,7 +625,7 @@ private Statement.Condition parseCondition(
 この実装ではConditionの構文を三トークンに限定しています。そのため、括弧を使った条件やAND、OR、NOTは解析できません。この制限により、ParserとQueryExecutorの条件処理を小さく保っています。
 
 == QueryExecutorによるStatementの実行
-
+Parserが生成したStatementだけでは、ページファイルに対する操作は行われません。本節では、Statementの種類ごとに実行処理を選択し、Catalog、Schema、Tableを組み合わせてCRUDへ接続する方針でQueryExecutorを実装します。
 @<code>{QueryExecutor.execute()}はStatementの実際の型を調べ、対応する実行メソッドを呼び出します。
 
 データの登録、取得、更新、削除というCRUDの意味と、最小構成での処理手順は、第2章「CRUD操作の実装」で説明しています。本章ではCRUD自体を再説明せず、SQLから作られたStatement、Schema、Catalog、Tableを使って各操作を実行する部分に注目します。
@@ -705,8 +706,9 @@ DELETEでは条件に一致したRecordIdをTable.deleteへ渡します。同じ
 WHERE句を省略した場合、@<code>{matches(row, null)}はtrueを返します。そのため、UPDATEまたはDELETEの対象は全行になります。
 
 == 実行結果の表示
+ここまでに実装したSQL処理が一連の流れとして動作するかを確認するには、各構文の入力と結果を対応付けて検証する必要があります。
 
-本章の実装では、QueryExecutorが処理結果を標準出力へ表示します。ここではusersとordersを作成し、INSERT、SELECT、FROM、WHERE、JOIN、UPDATE、DELETEの順に結果を確認します。
+本節では、QueryExecutorが処理結果を標準出力へ表示します。ここではusersとordersを作成し、INSERT、SELECT、FROM、WHERE、JOIN、UPDATE、DELETEの順に結果を確認します。
 
 REPLは一行の入力を一つのSQLとして解析するため、実行時には各SQLを一行で入力します。また、実行時間は環境によって異なるため、以下の出力例では@<code>{(Executed in ... ms)}を省略します。
 
