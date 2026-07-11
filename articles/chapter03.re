@@ -1,6 +1,6 @@
 = データの永続化
 
-== ファイルへの保存
+== ファイルを扱う準備
 
 前節では、データを永続化する必要性について説明しました。
 では、実際にはどこへデータを保存すればよいのでしょうか。
@@ -99,11 +99,25 @@ if (!Files.exists(dataPath.getParent())) {
 CSV（Comma-Separated Values）のように、項目をカンマで区切り、1行を1レコードとして表しています。
 
 
-`HashMap` の内容を@<code>{キー,値}へ変換し、ファイルへ書き込む処理を以下に示します。
+
+== ファイルへの保存
+
+前節では、データベースファイルの保存形式として、@<code>{キー,値}のテキスト形式を採用しました。
+しかし、保存形式を決めただけでは、データベースの内容はファイルへ反映されません。
+データベースへレコードを追加・更新・削除したときに、その内容をファイルへ書き出す処理が必要になります。
+また、データベースを起動したときに、ファイルに保存されたデータベースの内容を読み出す処理が必要になります。
+本節では、その役割を担う `saveToFile()`と`loadFromFile()` メソッドを実装します。
+
+
+=== 保存と読み込みの実装
+
+`saveToFile()`では、まず、`HashMap`の全要素について、各要素を@<code>{キー,値}形式の文字列へ変換します。
+そして、ファイルへ書き込みます。
 
 //emlist{
 List<String> lines =
-    db.entrySet().stream()
+    db.entrySet()
+      .stream()
       .map(entry -> entry.getKey() + "," + entry.getValue())
       .toList();
 Files.write(dataPath, lines);
@@ -125,129 +139,6 @@ for (String line : lines) {
 //}
 
 
-
-
-== 更新処理の実装
-
-前節では、データベースファイルの保存形式として、`キー,値` のテキスト形式を採用しました。
-しかし、保存形式を決めただけでは、データベースの内容はファイルへ反映されません。
-データベースへレコードを追加・更新・削除したときに、その内容をファイルへ書き出す処理が必要になります。
-本節では、その役割を担う `saveToFile()` メソッドを実装します。
-
-
-=== 保存処理の流れ
-
-現在のデータは、すべて `HashMap` に保存されています。
-例えば、
-
-//emlist{
-1 → Alice
-2 → Bob
-3 → Carol
-//}
-
-という状態になっているとします。
-これをそのままファイルへ保存することはできません。
-そこで、まず各レコードを文字列へ変換し、
-
-//emlist{
-1,Alice
-2,Bob
-3,Carol
-//}
-
-という一覧を作成します。
-最後に、その一覧をファイルへ書き込みます。
-処理の流れを図で表すと、次のようになります。
-
-//emlist{
-HashMap
-  │
-  ▼
-レコードを文字列へ変換
-  │
-  ▼
-List<String>
-  │
-  ▼
-chapter02.db
-//}
-
-
-=== レコードを文字列へ変換する
-
-保存処理では、`HashMap` の各要素を
-
-//emlist{
-キー,値
-//}
-
-という文字列へ変換します。
-コードでは、`entrySet()` を利用してMapのすべての要素を取得しています。
-
-//emlist{
-List<String> lines =
-    db.entrySet()
-      .stream()
-      .map(entry -> entry.getKey() + "," + entry.getValue())
-      .toList();
-//}
-
-ここで、
-
-//emlist{
-1 → Alice
-//}
-
-というデータは、
-
-//emlist{
-1,Alice
-//}
-
-という1行へ変換されます。
-同様に、
-
-//emlist{
-1 → Alice
-2 → Bob
-3 → Carol
-//}
-
-というMapは、
-
-//emlist{
-1,Alice
-2,Bob
-3,Carol
-//}
-
-という文字列の一覧になります。
-この一覧が、そのままデータベースファイルの内容になります。
-
-
-=== ファイルへ書き込む
-
-文字列へ変換したあとは、
-`Files.write()` を利用してファイルへ保存します。
-
-//emlist{
-Files.write(dataPath, lines);
-//}
-
-`dataPath` は第2.2節で作成した保存先を表す `Path` オブジェクトです。
-`Files.write()` は、指定したファイルへ文字列の一覧を書き込みます。
-実行後の `chapter02.db` は次のようになります。
-
-//emlist{
-1,Alice
-2,Bob
-3,Carol
-//}
-
-これで、データベースの内容がディスクへ保存されました。
-
-
 === CRUD操作と保存処理
 
 データベースの内容が変化するのは、
@@ -262,10 +153,7 @@ Files.write(dataPath, lines);
 
 //emlist{
 db.putIfAbsent(id, value);
-
 saveToFile();
-
-System.out.println("Inserted and saved to disk.");
 //}
 
 という流れになっています。
@@ -273,60 +161,21 @@ System.out.println("Inserted and saved to disk.");
 
 //emlist{
 db.put(id, value);
-
 saveToFile();
-
-System.out.println("Updated and saved to disk.");
 //}
 
 `delete()` では、
 
 //emlist{
 db.remove(id);
-
 saveToFile();
-
-System.out.println("Deleted and saved to disk.");
 //}
 
 となっています。
 一方、`select` はデータを参照するだけで内容を変更しないため、保存処理は不要です。
-そのため、
 
-//emlist{
-| コマンド   | ファイル保存 |
-| ------ | ------ |
-| insert | ○      |
-| select | ×      |
-| update | ○      |
-| delete | ○      |
-//}
-
-という構成になっています。
-
-
-=== 更新のたびに保存する理由
 
 本書では、データを変更するたびにファイルへ保存しています。
-例えば、
-
-//emlist{
-db > insert 1 Alice
-//}
-
-を実行すると、
-
-//emlist{
-HashMapへ登録
-        │
-        ▼
-saveToFile()
-        │
-        ▼
-chapter02.db を更新
-//}
-
-という流れになります。
 このようにすることで、プログラムが途中で終了しても、直前までのデータがディスクへ保存されています。
 実装も非常にシンプルで、処理の流れを理解しやすいという利点があります。
 
@@ -337,68 +186,33 @@ chapter02.db を更新
 これにより、データは `HashMap` に保存されるだけでなく、ディスク上のファイルにも保存されるようになりました。
 本節では、実際にデータベースを操作し、プログラムを再起動したあともデータが保持されていることを確認します。
 
-
-=== データを登録する
-
 まずはデータベースを起動し、いくつかのレコードを登録します。
 
 //emlist{
-Welcome to nekoDB!
-
 db > insert 1 Alice
-Inserted and saved to disk.
-
 db > insert 2 Bob
-Inserted and saved to disk.
-
-db > insert 3 Carol
-Inserted and saved to disk.
 //}
 
-第1章では `Inserted.` と表示していましたが、第2章では登録と同時にファイルへの保存も行われるため、
-
-//emlist{
-Inserted and saved to disk.
-//}
-
-というメッセージが表示されます。
 この時点で、メモリ上の `HashMap` だけでなく、データベースファイルにも同じ内容が保存されています。
-
-
-=== データベースファイルを確認する
-
 保存されたファイルをテキストエディタで開くと、次のような内容になっています。
 
 //emlist{
 1,Alice
 2,Bob
-3,Carol
 //}
 
-1行が1レコードとなっており、
-
-//emlist{
-キー,値
-//}
-
-という形式で保存されていることが確認できます。
+1行が1レコードとなっており、@<code>{キー,値}という形式で保存されていることが確認できます。
 プログラム内部では `HashMap` として管理されていますが、ファイル上ではシンプルなテキスト形式へ変換されていることが分かります。
-
-
-=== プログラムを再起動する
 
 次に、データベースを終了します。
 
 //emlist{
 db > exit
-Bye!
 //}
 
 ここでプログラムは終了しますが、ファイルはディスク上に残っています。
 その後、再びデータベースを起動します。
-起動時にはコンストラクタから `loadFromFile()` が呼び出され、保存されていたデータが `HashMap` に読み込まれます。
-
-その状態で、
+起動後に、
 
 //emlist{
 db > select
@@ -409,63 +223,10 @@ db > select
 //emlist{
 (1,Alice)
 (2,Bob)
-(3,Carol)
 //}
 
 と表示されます。
 これは、第1章とは異なり、前回終了時のデータが正しく復元されたことを意味しています。
-
-
-=== 更新・削除も保存される
-
-更新や削除についても同様です。
-例えば、
-
-//emlist{
-db > update 2 Robert
-Updated and saved to disk.
-//}
-
-を実行すると、
-ファイルの内容は
-
-//emlist{
-1,Alice
-2,Robert
-3,Carol
-//}
-
-へ更新されます。
-続いて、
-
-//emlist{
-db > delete 1
-Deleted and saved to disk.
-//}
-
-を実行すると、
-ファイルの内容は
-
-//emlist{
-2,Robert
-3,Carol
-//}
-
-となります。
-再びデータベースを起動しても、
-
-//emlist{
-db > select
-//}
-
-の結果は
-
-//emlist{
-(2,Robert)
-(3,Carol)
-//}
-
-となり、更新内容や削除内容も保持されていることが確認できます。
 
 
 
