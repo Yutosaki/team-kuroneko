@@ -11,7 +11,7 @@ import java.util.Scanner;
 import customdb.chapter03.Parser.SimpleParser;
 
 public class nekoDB {
-  private static final String DATA_PATH = "data/chapter02.db";
+  private static final String DATA_PATH = "data/chapter03.db";
   private Map<Integer, String> db;
   private Scanner scanner;
   private SimpleParser parser;

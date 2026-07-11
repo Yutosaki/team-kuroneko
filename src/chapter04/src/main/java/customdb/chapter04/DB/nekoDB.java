@@ -11,7 +11,7 @@ import java.util.Scanner;
 import customdb.chapter04.Parser.SimpleParser;
 
 public class nekoDB {
-  private static final String DATA_PATH = "data/chapter03.db";
+  private static final String DATA_PATH = "data/chapter04.db";
 
   // ページサイズとスロットの定数
   private static final int PAGE_SIZE = 4096; // 4KB
