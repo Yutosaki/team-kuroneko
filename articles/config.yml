@@ -22,7 +22,10 @@ bookname: kuroneko-book
 language: ja
 
 # 書名
-booktitle: { name: "0から始める課題駆動型自作DB", file-as: "kuroneko-book" }
+booktitle:
+  name: "0から始める自作データベース"
+  subtitle: "課題駆動で紐解くDBの仕組み"
+  file-as: "kuroneko-book"
 
 # 著者名。「, 」で区切って複数指定できる
 aut:
