@@ -10,3 +10,10 @@ articles/*.html
 articles/*.xml
 articles/*.txt
 articles/_refiles/
+
+src/data
+
+# Gradle / build artifacts (any depth)
+.gradle/
+build/
+bin/
