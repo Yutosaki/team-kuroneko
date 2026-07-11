@@ -10,3 +10,8 @@ articles/*.html
 articles/*.xml
 articles/*.txt
 articles/_refiles/
+
+src/.gradle
+src/build/
+src/bin/
+src/data
