@@ -28,17 +28,15 @@
 
 //emlist{
 project
-│
 ├── src
-│
 └── data
-     └── chapter02.db
+     └── chapter03.db
 //}
 
 プログラムでは、保存先を定数として定義しています。
 
 //emlist{
-private static final String DATA_PATH = "data/chapter02.db";
+private static final String DATA_PATH = "data/chapter03.db";
 //}
 
 
