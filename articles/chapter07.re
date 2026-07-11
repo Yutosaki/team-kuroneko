@@ -1,4 +1,4 @@
-= 第7章 プランナーによる実行計画の選択
+= プランナーによる実行計画の選択
 
 == 第6章までの課題：常に全件走査するSELECT
 
@@ -7,6 +7,7 @@
 第5章ではB-Treeによる検索の高速化を実装しましたが、第6章のテーブル構造には組み込まれていません。全件走査の処理時間はレコードの件数に比例するため、データ量が増加するとパフォーマンスが悪化します。
 
 インデックスによる検索を適切に行うには、以下の判断が必要です。
+
  * WHERE句が指定されているか
  * 条件の左辺に対応するカラムが存在するか
  * そのカラムにインデックスが設定されているか
@@ -63,7 +64,7 @@ boolean indexed = false;
 
 // STRING型の場合は括弧内の長さを読み取る（第6章と同じ）
 if (index < tokens.size() && tokens.get(index).equals("(")) {
-  // ...
+  // 長さの読み取り処理（省略）
 }
 
 // データ型の後ろにINDEXがあれば対象とする
@@ -77,10 +78,10 @@ columns.add(new Schema.Column(columnName, type, length, indexed));
 
 これに合わせて、@<code>{Schema.Column}に@<code>{indexed}フラグを追加します。インデックスの有無は検索方法の決定に使用されるため、ディスク上のレコードサイズには影響しません。
 
-テーブル定義を永続化する@<code>{catalog.txt}の保存フォーマットも変更します。末尾にインデックスの有無（1または0）を追加した4項目とします。
+テーブル定義を永続化する@<code>{catalog.txt}の保存フォーマットも変更します。末尾にインデックスの有無（1または0）を追加した4項目とします（※下記は読みやすくするため区切り文字の後にスペースを入れています）。
 
 //cmd{
-users|id:INTEGER:0:1,name:STRING:20:0,age:INTEGER:0:0
+users | id:INTEGER:0:1, name:STRING:20:0, age:INTEGER:0:0
 //}
 
 == インデックスの構築と同期処理
@@ -148,11 +149,12 @@ public Plan createPlan(Statement.Select statement, Schema schema) {
 //}
 
 現在の実装では、@<code>{IndexScanPlan}が選択される条件は以下のすべてを満たす場合のみです。
+
  * 対象カラムが@<code>{INTEGER}型である
  * 対象カラムに@<code>{INDEX}が指定されている
  * 比較演算子が@<code>{=}である
 
-範囲検索（@<code>{>}など）を含め、条件を満たさない場合はすべて全件走査（@<code>{SeqScanPlan}）を選択します。
+本実装では範囲検索（@<code>{>}など）を含め、条件を満たさない場合はすべて全件走査（@<code>{SeqScanPlan}）を選択します。ただし、インデックスのデータ構造としてB-Treeの代わりに「B+Tree（葉ノード同士がポインタで連結された構造）」を採用していれば、範囲検索でもインデックスを活用して効率的にデータを走査することが可能になります。
 
 == 実行処理の分離
 
@@ -160,7 +162,10 @@ public Plan createPlan(Statement.Select statement, Schema schema) {
 
 //emlist[PlanとExecutionContextのインターフェース][java]{
 public interface Plan {
-  void execute(ExecutionContext context, Statement.Select statement) throws IOException;
+  void execute(
+      ExecutionContext context, 
+      Statement.Select statement
+  ) throws IOException;
 }
 
 public interface ExecutionContext {
@@ -181,7 +186,7 @@ if (column != null) {
 }
 
 List<Row> rows = table.searchByIndex(condition.left(), value);
-// 取得した行に対してJOIN・WHEREを適用する
+// 取得した行に対してJOIN・WHEREを適用する処理（省略）
 //}
 
 == 実行例とプランの確認
@@ -221,6 +226,7 @@ SeqScan : users
 == まとめと次章への課題
 
 本章では以下の機能を実装しました。
+
  * @<b>{INDEX}定義のカタログへの永続化。
  * テーブルごとのB-Treeインデックス管理とデータ同期。
  * @<b>{Planner}によるStatementとSchemaに基づく実行計画の決定。

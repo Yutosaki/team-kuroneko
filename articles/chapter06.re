@@ -26,7 +26,7 @@
 
 = テーブル定義とSQLの実行
 
-== 第5章までの課題：カラムの制限
+== 第5章までの課題：テーブルの拡張性
 
 第5章「B-Treeを用いたCRUDの高速化」では、ページ内のレコードをB-Treeから検索する方法を扱いました。一方、第5章までのテーブルは、@<code>{id}と@<code>{name}という決められたカラムを前提としていました。別のカラムを追加したり、整数や文字列以外のデータ型を使用したりするには、プログラム自体を変更する必要があります。
 
@@ -251,7 +251,7 @@ Catalogは起動時にcatalog.txtを読み、SchemaとTableを復元します。
 入力されたSQL文字列のままでは、実行処理がテーブル名や条件を安全に参照できません。
 本節では、SQLをTokenizerでトークンへ分割し、SimpleParserで構文を読み取り、実行に必要な情報をStatementとして表現する方針を採ります。
 
-=== Tokenizerによる字句解析
+=== 字句解析（Tokenizer）
 
 TokenizerはSQL文字列を、キーワード、識別子、リテラル、括弧、カンマ、比較演算子などのトークンへ分割します。SimpleParserがSQLを一文字ずつ扱わずに済むように、意味のある最小単位へ切り分ける処理です。
 
@@ -361,7 +361,7 @@ usersの後の空白      "users"          [INSERT, INTO, users]
  VALUES, (, 1, ,, 'Taro Yamada', )]
 //}
 
-=== SimpleParserによる構文解析
+=== 構文解析（SimpleParser）
 
 @<code>{SimpleParser.parseStatement()}は、先頭のトークンを調べて解析メソッドを選択します。
 
@@ -398,7 +398,7 @@ private void expect(List<String> tokens, int index, String expected) {
 
 キーワードは大文字と小文字を区別せず照合します。想定したトークンがなければ解析を継続せずIllegalArgumentExceptionを送出するため、不完全なStatementがQueryExecutorへ渡ることはありません。
 
-=== StatementによるASTの表現
+=== ASTの表現（Statement）
 
 抽象構文木（Abstract Syntax Tree、AST）は、プログラムやSQLの構造を木として表したデータです。「抽象」という名前は、元の文字列に含まれる空白、改行、キーワードの大文字・小文字、括弧やカンマなどの表記上の情報を取り除き、実行に必要な意味だけを残すことに由来します。
 
