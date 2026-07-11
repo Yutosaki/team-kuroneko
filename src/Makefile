@@ -1,5 +1,5 @@
 # 実行する章のデフォルト値（コマンドラインから上書き可能）
-CHAP ?= chapter01
+CHAP ?= chapter02
 
 # 開発環境の起動
 up:
@@ -19,7 +19,7 @@ build:
 shell:
 	docker compose exec dev bash
 
-# プログラムの実行 (例: make run または make run CHAP=chapter02)
+# プログラムの実行 (例: make run または make run CHAP=chapter03)
 run:
 	docker compose exec dev gradle :$(CHAP):run --console=plain
 
@@ -31,7 +31,7 @@ fmt:
 check:
 	docker compose exec dev gradle spotlessCheck --no-configuration-cache
 
-# 10000件のテストデータを一括投入する (例: make insert または make insert CHAP=chapter03)
+# 10000件のテストデータを一括投入する (例: make insert または make insert CHAP=chapter04)
 insert:
 	./insert_data.sh $(CHAP)
 
