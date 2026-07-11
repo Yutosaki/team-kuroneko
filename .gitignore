@@ -11,7 +11,9 @@ articles/*.xml
 articles/*.txt
 articles/_refiles/
 
-src/.gradle
-src/build/
-src/bin/
 src/data
+
+# Gradle / build artifacts (any depth)
+.gradle/
+build/
+bin/
