@@ -124,7 +124,7 @@ private RecordId search(BTreeNode node, int key) {
   // ノード内のキーを順番に比較し、進むべき枝（インデックス i）を探す
   while (i < node.numKeys && key > node.keys[i]) i++;
 
-  // キーが一致すれば、その位置のRecordIdを返す（発見！）
+  // キーが一致すれば、その位置のRecordIdを返す
   if (i < node.numKeys && key == node.keys[i]) {
     return node.values[i];
   }
