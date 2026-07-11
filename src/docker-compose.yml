@@ -1,0 +1,8 @@
+services:
+  dev:
+    build: .
+    volumes:
+      - .:/app
+    # REPL（対話型プログラム）で標準入力を受け付けるために必須
+    stdin_open: true
+    tty: true
