@@ -2,7 +2,6 @@ PREDEF:
   - preface.re
 
 CHAPS:
-  - chapter00.re
   - chapter01.re
   - chapter02.re
   - chapter03.re
@@ -14,6 +13,7 @@ CHAPS:
   - chapter09.re
   - chapter10.re
   - chapter11.re
+  - chapter12.re
 
 APPENDIX:
 
