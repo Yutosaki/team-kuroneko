@@ -1,4 +1,8 @@
 = 著者紹介
 
-==== 第1章 ひつじ / @mhidaka
-ひつじだよ〜
+==== 佐佐木悠人
+
+Student at 42Tokyo
+
+github: Yutosaki
+
