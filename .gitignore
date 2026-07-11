@@ -3,7 +3,7 @@ Gemfile.lock
 *.pdf
 .sass-cache/
 
-!articles/*.pdf
+# !articles/*.pdf
 articles/*.epub
 articles/*.html
 # articles/*.md
