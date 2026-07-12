@@ -23,17 +23,17 @@ language: ja
 
 # 書名
 booktitle:
-  name: "0から作る自作DBの教科書"
-  subtitle: "課題駆動で紐解くDBの仕組み"
+  name: "0から作る自作DB入門 "
+  subtitle: "課題駆動で学ぶDBの仕組み"
   file-as: "kuroneko-book"
 
 # 著者名。「, 」で区切って複数指定できる
 aut:
   [
-    { name: "久保友樹", file-as: "kubo" },
-    { name: "小林龍生", file-as: "kobayashi" },
-    { name: "佐佐木悠人", file-as: "sasaki yuto" },
-    { name: "白根薫", file-as: "shirane" },
+    { name: "久保 友樹", file-as: "kubo" },
+    { name: "小林 龍生", file-as: "kobayashi" },
+    { name: "佐佐木 悠人", file-as: "sasaki yuto" },
+    { name: "白根 薫", file-as: "shirane" },
   ]
 # 以下はオプション
 # 以下はオプション(autと同じように配列書式で複数指定可能)。
@@ -83,10 +83,10 @@ date: 2026-7-12
 # 複数指定する場合は次のように記述する
 # [["初版第1刷の日付", "初版第2刷の日付"], ["第2版第1刷の日付"]]
 # 日付の後ろを空白文字で区切り、任意の文字列を置くことも可能。
-history: [["2026-4-11 技術書典20版 v1.0.0"]]
+history: [["2026-7-12 v1.0.0"]]
 # 権利表記(配列で複数指定可)
 # rights: (C) 2016 Re:VIEW Developers
-rights: (C) 2017-2026 TechBooster
+rights: (C) 2026-2035 くろねこチーム
 # description: 説明
 # subject: 短い説明用タグ(配列で複数指定可)
 # type: 書籍のカテゴリーなど(配列で複数指定可)
@@ -387,7 +387,11 @@ texstyle: ["reviewmacro"]
 #     "media=print,paper=b5,serial_pagination=true,hiddenfolio=nikko-pc,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm,cover_fit_page=true",
 #   ]
 # B5の設定(10pt 40文字×35行) - 電子版
-texdocumentclass: ["review-jsbook", "media=ebook,paper=b5,serial_pagination=true,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm"]
+texdocumentclass:
+  [
+    "review-jsbook",
+    "media=ebook,paper=b5,serial_pagination=true,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm",
+  ]
 # A5の設定(9pt 38文字×37行) - 紙版
 # texdocumentclass: ["review-jsbook", "media=print,paper=a5,serial_pagination=true,hiddenfolio=nikko-pc,openany,fontsize=9pt,baselineskip=13pt,line_length=38zw,number_of_lines=37,head_space=15mm,headsep=3mm,headheight=5mm,footskip=10mm"]
 # A5の設定(9pt 38文字×37行) - 電子版
