@@ -659,7 +659,7 @@ Rowが完成すると、TableはSchemaのカラム順に値を直列化します
 
 SELECTでは、FROM句のTableに対して@<code>{scan()}を呼び出します。WHERE条件がある場合は、各Rowに対して@<code>{matches()}を実行し、一致した行だけを残します。その後、SELECT句に指定されたカラムだけを@<code>{projectRow()}で取り出します。
 
-//image[chapter06_image03][][scale=0.5]{
+//image[chapter06_image03][][scale=0.3]{
 //}
 
 
