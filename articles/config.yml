@@ -23,7 +23,7 @@ language: ja
 
 # 書名
 booktitle:
-  name: "0から始める自作データベース"
+  name: "0から作る自作DBの教科書"
   subtitle: "課題駆動で紐解くDBの仕組み"
   file-as: "kuroneko-book"
 
@@ -418,7 +418,7 @@ pdfmaker:
   # 仕上がりサイズ+塗り足し3mmありのPDFまたはIllustratorファイル（PDF互換オプション付き）を推奨。
   # 拡縮はされず「そのまま」貼り付けられる
   # 原寸画像を用意できないときには、「,cover_fit_page=true」をtexdocumentclassパラメータの2つめの値に追加すると、仕上がりサイズにリサイズして貼り付ける
-  coverimage: cover_title.png
+  coverimage: cover_title_color_2_meiryo.png
   #
   # TeXコンパイル前に実行するプログラム。変換後のTeXソースを調整したいときに使用する。
   # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
@@ -500,4 +500,4 @@ techbooster:
   # texdocumentclassでcover_fit_page=trueを付けるのと同じ
   cover_fit_page: true
   # 裏表紙画像指定。画像はimages/から探索される
-  backcoverimage: cover_back.png
+  backcoverimage: cover_back_color_2.png
