@@ -23,17 +23,17 @@ language: ja
 
 # 書名
 booktitle:
-  name: "0から作る自作DBの教科書"
-  subtitle: "課題駆動で紐解くDBの仕組み"
+  name: "0から作る自作DB入門 "
+  subtitle: "課題駆動で学ぶDBの仕組み"
   file-as: "kuroneko-book"
 
 # 著者名。「, 」で区切って複数指定できる
 aut:
   [
-    { name: "久保友樹", file-as: "kubo" },
-    { name: "小林龍生", file-as: "kobayashi" },
-    { name: "佐佐木悠人", file-as: "sasaki yuto" },
-    { name: "白根薫", file-as: "shirane" },
+    { name: "久保 友樹", file-as: "kubo" },
+    { name: "小林 龍生", file-as: "kobayashi" },
+    { name: "佐佐木 悠人", file-as: "sasaki yuto" },
+    { name: "白根 薫", file-as: "shirane" },
   ]
 # 以下はオプション
 # 以下はオプション(autと同じように配列書式で複数指定可能)。

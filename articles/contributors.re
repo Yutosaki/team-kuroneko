@@ -8,7 +8,6 @@ github: ryu-k67
 
 ==== 佐佐木 悠人
 github: Yutosaki
-
 Student at 42Tokyo
 
 ==== 白根 薫
