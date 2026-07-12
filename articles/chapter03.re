@@ -121,7 +121,7 @@ CSV（Comma-Separated Values）のように、項目をカンマで区切り、1
 本節では、その役割を担うsaveToFile()とloadFromFile()メソッドを実装します。
 
 
-=== 保存と読み込みの実装
+==== 保存と読み込みの実装
 
 saveToFile()では、まず、HashMapの全要素について、各要素を@<code>{キー,値}形式の文字列へ変換します。
 そして、ファイルへ書き出します。
@@ -176,7 +176,7 @@ private void loadFromFile() {
 //}
 
 
-=== CRUD操作と保存処理
+==== CRUD操作と保存処理
 
 データベースの内容が変化するのは、
 
