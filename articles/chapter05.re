@@ -64,11 +64,11 @@ static class RecordId {
 
 //emlist[B-Treeの全体構造（高さ3の例）]{
                      [ 50 ]
-                  /          \
-                /              \
-      [ 20 | 35 ]              [ 65 | 80 ]
-       /   |   \                /   |   \
-     /     |     \            /     |     \
+                   /         \
+                 /             \
+       [ 20 | 35 ]             [ 65 | 80 ]
+        /   |   \                 /   |   \
+      /     |     \             /     |     \
 [10|15] [25|30] [40|45]  [55|60] [70|75] [85|90]
 //}
 
@@ -172,6 +172,7 @@ void splitChild(BTreeNode parent, int i, BTreeNode fullNode) {
     newNode.keys[j] = fullNode.keys[j + t];
     newNode.values[j] = fullNode.values[j + t];
   }
+  // ※内部ノードの場合は子ポインタ(children)のコピー処理も必要です
 
   fullNode.numKeys = t - 1; // 満杯ノードは「左半分」だけになる
 
@@ -212,7 +213,7 @@ void splitChild(BTreeNode parent, int i, BTreeNode fullNode) {
 親の「40」が対象ノードに降り、左隣接ノードの最大値「30」が親に上がる
 親ノード:          [ 30 ]
                  /      \
-左の隣接ノード:           対象ノード:
+左の隣接ノード:            対象ノード:
 [ 10 | 20 ]             [ 40 | 50 ]
 //}
 
@@ -304,7 +305,7 @@ private void buildTree() throws IOException {
 具体的には、検索・更新処理ではページ走査の @<code>{for} ループを削除し、@<code>{btree.search(id)} で取得した位置情報へ @<code>{file.seek()} で直接アクセスします。挿入処理では @<code>{freeList.poll()} から空き領域を即座に取得し、削除処理では空いた領域を @<code>{freeList.offer()} で再利用リストへ戻します。
 
 //emlist[B-Treeを利用したselect処理の改善][java]{
-public void select(String key) {
+public void select(int id) {
   try {
     // 1. B-Treeから位置情報 (RecordId) を取得
     RecordId rid = btree.search(id);
@@ -385,6 +386,6 @@ insert 10001 test	3.310 ms	1.218 ms
 
 現代のリレーショナルデータベースが広く使われている最大の理由は、ユーザーが「欲しいデータ（目的）」だけを宣言的に記述すれば、データベース側が自動的に「最適な検索手順（手段）」を判断して実行してくれる点にあります。
 
-次章（第5章）では、この課題を解決するために @<b>{SQL} の処理エンジンをデータベースに組み込みます。「何をするか」を記述する標準言語であるSQLを読み解くため、字句解析（トークナイズ）や構文解析（パース）、そして抽象構文木（AST）の構築といった、言語処理系の領域へと足を踏み入れます。
+次章（第6章）では、この課題を解決するために @<b>{SQL} の処理エンジンをデータベースに組み込みます。「何をするか」を記述する標準言語であるSQLを読み解くため、字句解析（トークナイズ）や構文解析（パース）、そして抽象構文木（AST）の構築といった、言語処理系の領域へと足を踏み入れます。
 
 まずは第一歩として、@<code>{SELECT} 文や @<code>{INSERT} 文をプログラムが理解できる形に変換する仕組みを作っていきましょう。
