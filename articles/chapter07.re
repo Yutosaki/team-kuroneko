@@ -1,10 +1,10 @@
-= プランナーによる実行計画の選択
+= プランナによる実行計画の選択
 
 == 第6章までの課題：常に全件走査するSELECT
 
-第6章で実装したSELECT文は、FROM句のテーブルに対して@<code>{Table.scan()}を呼び出し、全行をディスクから読み出してからWHERE条件で絞り込んでいます。この方式では、条件指定の有無や内容に関わらず常に全件走査（フルスキャン）となります。
+第6章で実装したSELECT文は、FROM句のテーブルに対して@<code>{Table.scan()}を呼び出し、全行をディスクから読み出してからWHERE条件で絞り込んでいます。この方式では、条件指定の有無や内容に関わらず、常に全件走査（フルスキャン）となってしまいます。
 
-第5章ではB-Treeによる検索の高速化を実装しましたが、第6章のテーブル構造には組み込まれていません。全件走査の処理時間はレコードの件数に比例するため、データ量が増加するとパフォーマンスが悪化します。
+第5章ではB-Treeによる検索の高速化を実装しましたが、第6章の汎用的なテーブル構造にはまだ組み込まれていません。全件走査の処理時間はレコードの件数に比例するため、データ量が増加するとパフォーマンスが著しく悪化します。
 
 インデックスによる検索を適切に行うには、以下の判断が必要です。
 
@@ -13,11 +13,11 @@
  * そのカラムにインデックスが設定されているか
  * 比較演算子がインデックスで処理可能か
 
-これらを評価し、インデックス検索と全件走査のどちらで実行するかを決定する役割が@<b>{プランナー（Planner）}です。本章では、SQLの解析結果（Statement）とテーブル定義（Schema）から@<b>{実行計画（Execution Plan）}を生成し、最適な実行方法を選択する仕組みを実装します。
+これらを評価し、インデックス検索と全件走査のどちらで実行するかを決定する役割が@<b>{プランナ（Planner）}です。本章では、SQLの解析結果（Statement）とテーブル定義（Schema）から@<b>{実行計画（Execution Plan）}を生成し、最適な実行方法を選択する仕組みを実装します。
 
-== 実行計画とプランナーの導入
+== 実行計画とプランナの導入
 
-方針として、実行方法を決定する「プランナー」と、実際のデータ読み書きを担う「エクゼキュータ」を分離します。検索方法が増加した際のシステムの複雑化を防ぐためです。
+方針として、実行方法を決定する「プランナ」と、実際のデータ読み書きを担う「クエリエグゼキュータ」を明確に分離します。検索方法（アルゴリズム）が増加した際に、システム全体が複雑化するのを防ぐためです。
 
 本章では、全件走査を表す@<code>{SeqScanPlan}と、インデックス検索を表す@<code>{IndexScanPlan}の2種類の実行計画（プラン）を用意します。システム全体の流れは以下のようになります。
 
@@ -25,24 +25,24 @@
 Statement.Select ＋ Schema
         │
         ▼
-Planner.createPlan()
+   プランナ（Planner）
         │
    ┌────┴────┐
    ▼         ▼
 IndexScanPlan  SeqScanPlan
-        │
+   │         │
    └────┬────┘
         ▼
-Plan.execute(context, statement)
+   Plan.execute()
         │
         ▼
-QueryExecutor
+クエリエグゼキュータ（QueryExecutor）
         │
         ▼
-   結果を表示
+    結果を表示
 //}
 
-第6章では@<code>{QueryExecutor.executeSelect()}が直接テーブルを走査していましたが、本章からはプランナーにプランを作成させ、そのプランを実行する流れに変更します。
+第6章では@<code>{QueryExecutor.executeSelect()}が直接テーブルを走査していましたが、本章からはプランナにプラン（計画）を作成させ、エグゼキュータはそのプランをただ実行するだけの流れに変更します。
 
 //emlist[プランを作って実行するexecuteSelect][java]{
 private void executeSelect(Statement.Select statement) throws IOException {
@@ -54,7 +54,7 @@ private void executeSelect(Statement.Select statement) throws IOException {
 
 == カラムへのインデックス定義とカタログ保存
 
-プランナーがインデックス検索を選択できるように、テーブル定義にインデックスの有無を含めます。
+プランナがインデックス検索を選択できるように、テーブル定義（Schema）にインデックスの有無を含めます。
 
 @<code>{CREATE TABLE}文のカラム定義に@<code>{INDEX}キーワードを追加可能にし、Parserの構文解析処理を拡張します。
 
@@ -68,7 +68,7 @@ if (index < tokens.size() && tokens.get(index).equals("(")) {
 }
 
 // データ型の後ろにINDEXがあれば対象とする
-if (index < tokens.size() && equalsIgnoreCase(tokens.get(index), "index")) {
+if (index < tokens.size() && tokens.get(index).equalsIgnoreCase("index")) {
   indexed = true;
   index++;
 }
@@ -76,7 +76,7 @@ if (index < tokens.size() && equalsIgnoreCase(tokens.get(index), "index")) {
 columns.add(new Schema.Column(columnName, type, length, indexed));
 //}
 
-これに合わせて、@<code>{Schema.Column}に@<code>{indexed}フラグを追加します。インデックスの有無は検索方法の決定に使用されるため、ディスク上のレコードサイズには影響しません。
+これに合わせて、@<code>{Schema.Column}に@<code>{indexed}フラグを追加します。インデックスの有無は検索方法の決定に使用されるメタデータであるため、ディスク上のレコードサイズには影響しません。
 
 テーブル定義を永続化する@<code>{catalog.txt}の保存フォーマットも変更します。末尾にインデックスの有無（1または0）を追加した4項目とします（※下記は読みやすくするため区切り文字の後にスペースを入れています）。
 
@@ -86,7 +86,7 @@ users | id:INTEGER:0:1, name:STRING:20:0, age:INTEGER:0:0
 
 == インデックスの構築と同期処理
 
-インデックスは、キーから行を検索するためのB-Treeをラップした@<code>{Index}クラスとして実装し、@<code>{Table}クラスごとに保持します。同一キーの複数行に対応するため、1つのキーに対して@<code>{List<Row>}を保持する構造とします。
+インデックスは、キーから行を検索するためのB-Treeをラップした@<code>{Index}クラスとして実装し、@<code>{Table}クラスごとに保持します。同一のキーを持つ複数行に対応するため、1つのキーに対して@<code>{List<Row>}を保持する構造とします。
 
 //emlist[Indexが公開する操作][java]{
 public class Index {
@@ -98,7 +98,7 @@ public class Index {
 }
 //}
 
-インデックスのデータはディスクに保存せず、テーブルの起動時に実データを走査してメモリ上に再構築します。
+インデックスのデータはディスクに保存せず、テーブルの起動時（ロード時）に実データを走査してメモリ上に再構築します。
 
 //emlist[起動時にIndexを作り、既存行を登録する][java]{
 private final Map<String, Index> indexes = new HashMap<>();
@@ -121,11 +121,11 @@ private void buildIndexes() throws IOException {
 }
 //}
 
-また、INSERT、UPDATE、DELETEによるデータ変更時には、ディスクへの書き込みと同時に対応する@<code>{Index}の更新処理を実行し、実データとの整合性を保ちます。
+また、INSERT、UPDATE、DELETEによるデータ変更時には、ディスクへの書き込みと同時に対応する@<code>{Index}の更新処理も実行し、実データとの整合性を常に保ちます。
 
-== Plannerによる実行方法の選択
+== プランナによる実行方法（経路）の選択
 
-プランナー（@<code>{Planner}）は、Statementとテーブル定義に基づき、@<code>{SeqScanPlan}か@<code>{IndexScanPlan}のどちらを実行するかを決定します。
+プランナ（@<code>{Planner}）は、Statementとテーブル定義に基づき、@<code>{SeqScanPlan}か@<code>{IndexScanPlan}のどちらを実行するかを決定します。
 
 //emlist[条件を確認してプランを選ぶcreatePlan][java]{
 public Plan createPlan(Statement.Select statement, Schema schema) {
@@ -154,11 +154,12 @@ public Plan createPlan(Statement.Select statement, Schema schema) {
  * 対象カラムに@<code>{INDEX}が指定されている
  * 比較演算子が@<code>{=}である
 
-本実装では範囲検索（@<code>{>}など）を含め、条件を満たさない場合はすべて全件走査（@<code>{SeqScanPlan}）を選択します。ただし、インデックスのデータ構造としてB-Treeの代わりに「B+Tree（葉ノード同士がポインタで連結された構造）」を採用していれば、範囲検索でもインデックスを活用して効率的にデータを走査することが可能になります。
+本実装では範囲検索（@<code>{>}など）を含め、条件を満たさない場合はすべて全件走査（@<code>{SeqScanPlan}）を選択します。
+ただし、実際の商用データベースのように、インデックスのデータ構造としてB-Treeの代わりに「B+Tree（葉ノード同士がポインタで連結された構造）」を採用していれば、葉ノードを辿るだけで済むため、範囲検索でもインデックスを活用して効率的にデータを走査することが可能になります。
 
-== 実行処理の分離
+== 計画フェーズと実行フェーズの分離
 
-プランには決定された実行方法の情報のみを保持させ、実際の処理は@<code>{ExecutionContext}（本プログラムでは@<code>{QueryExecutor}）に委譲します。
+プラン（Plan）には決定された「実行方法の情報」のみを保持させ、実際のデータアクセス処理は@<code>{ExecutionContext}（本プログラムではQueryExecutorが実装）に委譲します。
 
 //emlist[PlanとExecutionContextのインターフェース][java]{
 public interface Plan {
@@ -174,7 +175,7 @@ public interface ExecutionContext {
 }
 //}
 
-@<code>{QueryExecutor}側の@<code>{executeSeqScan()}は、従来通りテーブル全行を読み込みます。@<code>{executeIndexScan()}は、@<code>{table.searchByIndex()}を呼び出してインデックスから該当レコードのみを読み込みます。
+@<code>{QueryExecutor}側の@<code>{executeSeqScan()}は、従来通りテーブル全行を読み込みます。一方の@<code>{executeIndexScan()}は、@<code>{table.searchByIndex()}を呼び出してインデックスから該当レコードのみをピンポイントで読み込みます。
 
 //emlist[executeIndexScan（要点）][java]{
 Statement.Condition condition = statement.whereCondition();
@@ -211,7 +212,7 @@ IndexScan : users
 {id=2, name=Hanako, age=18}
 //}
 
-インデックスのないカラムや、範囲検索を指定した場合は全件走査が選択されます。
+インデックスのないカラム（age）や、範囲検索（>）を指定した場合は全件走査が選択されます。
 
 //cmd{
 db > SELECT * FROM users WHERE age = 18;
@@ -227,11 +228,14 @@ SeqScan : users
 
 本章では以下の機能を実装しました。
 
- * @<b>{INDEX}定義のカタログへの永続化。
- * テーブルごとのB-Treeインデックス管理とデータ同期。
- * @<b>{Planner}によるStatementとSchemaに基づく実行計画の決定。
- * プラン（@<code>{Plan}）と処理（@<code>{ExecutionContext}）の分離。
+ * @<b>{INDEX}定義のカタログへの永続化
+ * テーブルごとのB-Treeインデックス管理とデータ同期
+ * @<b>{プランナ（Planner）}によるStatementとSchemaに基づく実行計画の決定
+ * プラン（@<code>{Plan}）と実行処理（@<code>{ExecutionContext}）の分離
 
-現在の実装では、抽出したレコードをすべて@<code>{List<Row>}に保持してから絞り込みや結合を行っています。データ量が増加するとメモリを過大に消費し、メモリ枯渇（Out Of Memory）が発生する課題が残っています。
+これにより、SQLの条件に応じて賢くインデックス検索と全件走査を切り替えられるようになり、検索速度が大きく改善されました。
 
-次章（第8章）では、処理単位を@<b>{演算子（Operator）}として分離し、1行ずつデータを処理するイテレータモデルを導入します。これにより、メモリ消費を抑えた効率的なクエリ実行アーキテクチャへと改修します。
+しかし、現在のクエリ実行の仕組みには、まだアーキテクチャ上の大きな欠陥があります。
+それは、現在の実装では、**抽出したレコードをすべてメモリ上の @<code>{List<Row>} に一気に保持してから、絞り込みや結合を行っている**という点です。データ量が増加すると、このリストがメモリを過大に消費し、いずれメモリ枯渇（Out Of Memory）を引き起こしてデータベースがクラッシュしてしまいます。
+
+次章（第8章）では、このメモリ枯渇問題を解決するため、処理単位を@<b>{オペレータ（Operator）}として細かく分離し、1行ずつデータをバケツリレーのように処理する「イテレータ（Volcano）モデル」を導入します。これにより、どれだけデータが増えてもメモリ消費を一定に抑えられる、堅牢なクエリ実行アーキテクチャへとシステムを改修します。
