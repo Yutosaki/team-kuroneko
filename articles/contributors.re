@@ -14,3 +14,5 @@ Student at 42Tokyo
 
 ==== 白根 薫
 github: RuoHacker
+
+趣味：電子工作（IoT、アケコン、自作キーボード（予定））
