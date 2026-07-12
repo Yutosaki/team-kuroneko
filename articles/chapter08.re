@@ -1,24 +1,24 @@
-= Operatorによる実行処理の分離
+= オペレータによる実行処理の分離
 
-== 第7章までの課題：実行処理の複雑化と中間結果
+== 第7章までの課題：実行処理とストレージの密結合、メモリ枯渇
 
-第7章では、SQLの条件に応じて全件走査とインデックス走査を選択するPlannerを実装しました。しかし、WHEREによる絞り込み、SELECT列の取り出し、JOINなどはQueryExecutorに残っており、機能を増やすたびにQueryExecutorの分岐も増える構造でした。
+第7章では、SQLの条件に応じて全件走査とインデックス走査を選択するプランナ（Planner）を実装しました。しかし、WHEREによる絞り込み、SELECT列の取り出し、JOINなどの処理は依然としてクエリエグゼキュータ（QueryExecutor）内に残っており、機能を増やすたびに分岐が肥大化してしまう密結合な構造でした。
 
-また、取得した行を@<code>{List<Row>}に保持してから次の処理へ渡すため、処理の途中に大きな中間結果が作られます。データが増えると、QueryExecutorの複雑さとメモリ使用量の両方が増加します。
+さらに深刻なのが、パフォーマンスとメモリの課題です。現在の実装では、取得した行を @<code>{List<Row>} に一気に保持してから次の処理（絞り込みなど）へ渡すため、処理の途中に巨大な中間結果が作られます。データが増えるとメモリを過大に消費し、いずれメモリ枯渇（Out Of Memory）を引き起こす危険性があります。
 
-第1章のロードマップでは、第8章を「構造の分離」を行う章と位置付けました。本章では、実行処理を@<b>{Operator}という小さな単位へ分け、必要な順序に組み合わせます。目指す効果は次のとおりです。
+第1章のロードマップで示した通り、本章では「構造の分離」を行います。実行処理を@<b>{オペレータ（Operator）}という小さな単位へ分け、それらをパイプラインのようにつなぎ合わせるアーキテクチャを導入します。目指す効果は次のとおりです。
 
- * 走査、絞り込み、射影、結合をOperatorという単位で分けることで、各処理を単独で変更・再利用できます。
- * 共通の@<code>{open()}、@<code>{next()}、@<code>{close()}を使うことで、異なる処理を同じ方法で実行できます。
- * 行を1行ずつ渡すことで、処理ごとに中間結果のListを作る必要がなくなります。
- * Operatorを木構造にすることで、SQLの処理順序を組み替えられます。
- * Plannerが実行木を作ることで、QueryExecutorはOperatorの種類を判断せずに済み、同じ実行処理を再利用できます。
+ * 走査、絞り込み、射影、結合を別々のオペレータに分けることで、単独で変更・再利用できる。
+ * 共通の @<code>{open()}、@<code>{next()}、@<code>{close()} を使うことで、異なる処理を同じ方法で実行できる。
+ * 行を1行ずつバケツリレーのように渡すことで、巨大な中間結果のListを作る必要がなくなり、省メモリ化の土台ができる。
+ * プランナがオペレータを組み合わせて「実行計画ツリー」を作ることで、クエリエグゼキュータは内部構造を意識せずに実行できる。
 
-つまり、本章の目的はクラスを増やすことではありません。SQLの機能を追加しても既存処理への影響を小さくできる、拡張しやすい実行基盤を作ることです。
+本章の目的は、単にクラスを増やすことではありません。今後SQLの機能を追加しても既存処理への影響を最小限に抑えられる、拡張性と堅牢性を備えた実行基盤を作ることです。
 
-== Operatorとイテレータモデルの導入
+== オペレータとイテレータ（Volcano）モデルの導入
 
-検索、絞り込み、射影、結合を一つのメソッドに書くと、処理順序を変更するたびにメソッド全体を修正しなければなりません。そこで、それぞれをOperatorとして分け、上位のOperatorが下位のOperatorへ1行ずつ要求する@<b>{イテレータモデル}を導入します。
+検索、絞り込み、射影、結合を一つのメソッドに書くと、処理順序を変更するたびにメソッド全体を修正しなければなりません。そこで、それぞれの役割をオペレータとして独立させ、上位のオペレータが下位のオペレータへ「次の1行をちょうだい」と要求するアーキテクチャを導入します。
+これはデータベースエンジンの世界で@<b>{イテレータモデル（またはVolcanoモデル）}と呼ばれる標準的な手法です。
 
 たとえば、次のSELECT文を考えます。
 
@@ -26,7 +26,7 @@
 SELECT name FROM users WHERE age >= 20;
 //}
 
-このSQLは、全件走査、条件による絞り込み、カラムの取り出しをつないだ実行木で表せます。
+このSQLは、全件走査、条件による絞り込み、カラムの取り出しというオペレータをつないだ「実行計画ツリー」で表せます。
 
 //cmd{
 ProjectOperator
@@ -41,9 +41,9 @@ SeqScanOperator
   users
 //}
 
-QueryExecutorが根のProjectOperatorへ行を要求すると、要求はFilterOperator、SeqScanOperatorの順に伝わります。SeqScanOperatorが返した行をFilterOperatorが判定し、条件を満たした行だけをProjectOperatorが{name=Taro}のような結果へ変換します。
+クエリエグゼキュータが根（トップ）の @<code>{ProjectOperator} へ行を要求すると、要求は @<code>{FilterOperator}、@<code>{SeqScanOperator} の順に下へ伝わります。一番下の @<code>{SeqScanOperator} が返した行を @<code>{FilterOperator} が判定し、条件を満たした行だけを @<code>{ProjectOperator} が @<code>{{name=Taro}} のような結果へ変換して上に返します。
 
-すべてのOperatorを同じ方法で扱うため、次のインターフェースを定義します。
+すべてのオペレータを同じ方法で扱うため、次のインターフェースを定義します。
 
 //emlist[Operatorインターフェース][java]{
 public interface Operator {
@@ -55,19 +55,17 @@ public interface Operator {
 }
 //}
 
-@<code>{open()}は処理の準備、@<code>{next()}は次の1行の取得、@<code>{close()}は終了処理を担当します。返せる行がなくなるとnextはnullを返します。
+@<code>{open()} は処理の準備、@<code>{next()} は次の1行の取得、@<code>{close()} は終了処理を担当します。返せる行がなくなると @<code>{next()} は @<code>{null} を返します。
 
-この約束を守れば、全件走査でもインデックス走査でも、QueryExecutorから見た実行方法は変わりません。また、各Operatorは子Operatorの種類を知らずにnextを呼べるため、走査方法や処理順序を差し替えられます。
+この約束を守れば、全件走査でもインデックス走査でも、呼び出し側から見た実行方法は変わりません。本章では、行を読み出す @<code>{SeqScanOperator} と @<code>{IndexScanOperator}、行を加工する @<code>{FilterOperator}、@<code>{ProjectOperator}、@<code>{NestedLoopJoinOperator}、データを変更する @<code>{InsertOperator}、@<code>{UpdateOperator}、@<code>{DeleteOperator} を順に実装していきます。
 
-本章では、行を読み出すSeqScanOperatorとIndexScanOperator、行を加工するFilterOperator、ProjectOperator、NestedLoopJoinOperator、データを変更するInsertOperator、UpdateOperator、DeleteOperatorを実装します。
+== 走査オペレータの実装
 
-== 走査Operatorの実装
-
-全件走査とインデックス走査を共通のOperatorとして扱えると、上位の絞り込みや射影を変更せずに検索方法だけを選択できます。本節では、実行木の葉から行を供給する二つのOperatorを作ります。
+全件走査とインデックス走査を共通のオペレータとして扱えると、上位の絞り込みや射影処理を変更することなく、プランナが検索方法だけを差し替えることができます。本節では、実行計画ツリーの「葉（一番下）」にあたり、行を供給する二つのオペレータを作ります。
 
 ==== SeqScanOperator
 
-@<code>{SeqScanOperator}は、指定されたTableの行を先頭から順に返します。openでIteratorを準備し、nextが呼ばれるたびに次のRowを返します。
+@<code>{SeqScanOperator} は、指定されたテーブルの行を先頭から順に返します。@<code>{open()} でイテレータを準備し、@<code>{next()} が呼ばれるたびに次のRowを返します。
 
 //emlist[SeqScanOperatorの主要な処理][java]{
 public void open() throws IOException {
@@ -88,11 +86,11 @@ public void close() throws IOException {
 }
 //}
 
-@<code>{qualifyRow()}は、idに加えてusers.idのようなテーブル名付きのカラムをRowへ登録します。これにより、単一テーブルでは短いカラム名を使い、JOINでは同名カラムをテーブル名で区別できます。
+@<code>{qualifyRow()} は、カラム名（id）をテーブル名付き（users.id）に変換してRowへ登録する処理です。これにより、単一テーブルでは短いカラム名を使いつつ、JOIN時には同名カラムをテーブル名で区別できるようになります。
 
 ==== IndexScanOperator
 
-@<code>{IndexScanOperator}は、第7章で実装した@<code>{Table.searchByIndex()}から一致する行を取得します。SeqScanOperatorと異なるのは、主にopenで行を取得する方法です。
+@<code>{IndexScanOperator} は、第7章で実装した @<code>{Table.searchByIndex()} を利用して、インデックスに一致する行だけを取得します。@<code>{SeqScanOperator} と異なるのは、主に @<code>{open()} で取得対象を絞り込む点です。
 
 //emlist[IndexScanOperatorのopen][java]{
 public void open() throws IOException {
@@ -110,35 +108,35 @@ public void open() throws IOException {
 }
 //}
 
-nextとcloseはSeqScanOperatorと同じ形です。そのため、上位のOperatorはどちらの走査方法が使われているかを意識しません。本章では、第7章と同じく、インデックス付きINTEGER型カラムに対する@<code>{=}条件でIndexScanOperatorを使用します。
+@<code>{next()} と @<code>{close()} は @<code>{SeqScanOperator} と同じ形です。そのため、上位のオペレータはどちらの走査方法が使われているかを一切意識しません。
 
-== 行を加工するOperatorの実装
+== 行を加工するオペレータの実装
 
-WHERE、SELECT、JOINを独立したOperatorへ分けると、条件評価やカラム選択を複数の実行計画から再利用できます。また、Operatorの接続順序によってSQLの処理順序を表せます。
+WHERE、SELECT、JOINといった処理を独立したオペレータへ分けることで、条件評価やカラム選択を複数の実行計画で再利用できるようになります。
 
 ==== FilterOperator
 
-@<code>{FilterOperator}は、子Operatorから受け取った行を評価し、WHERE条件を満たす行だけを返します。
+@<code>{FilterOperator} は、子オペレータ（下位）から受け取った行を評価し、WHERE条件を満たす行だけを上に返します。
 
 //emlist[条件に一致するまで行を取得する処理][java]{
 public Row next() throws IOException {
   while (true) {
     Row row = child.next();
     if (row == null) {
-      return null;
+      return null; // 子からのデータが尽きた
     }
     if (ConditionEvaluator.matches(row, condition)) {
-      return row;
+      return row; // 条件に一致した行だけを返す
     }
   }
 }
 //}
 
-条件評価は@<code>{ConditionEvaluator}へ分離します。第6章ではQueryExecutor内にあった比較処理を独立させることで、FilterOperatorだけでなくJOIN、UPDATE、DELETEからも同じ判定を利用できます。
+条件評価は @<code>{ConditionEvaluator} という別クラスへ分離します。第6章ではクエリエグゼキュータ内にあった比較処理を独立させることで、@<code>{FilterOperator} だけでなく後述の更新系オペレータ等からも同じ判定ロジックを利用できます。
 
 ==== ProjectOperator
 
-@<code>{ProjectOperator}は、子Operatorが返したRowをSELECT句に対応するRowへ変換します。
+@<code>{ProjectOperator} は、子オペレータが返したRowを、SELECT句で指定された形（特定のカラムのみ）へと変換（射影）します。
 
 //emlist[1行を射影する処理][java]{
 public Row next() throws IOException {
@@ -150,11 +148,11 @@ public Row next() throws IOException {
 }
 //}
 
-SELECT句が@<code>{*}なら全カラムを返し、カラム名が指定されていれば該当する値だけを返します。FilterOperatorの上に配置することで、「WHEREで絞り込んでからSELECT列を取り出す」という順序が実行木に表れます。
+SELECT句が @<code>{*} なら全カラムを返し、カラム名が指定されていれば該当する値だけを抽出して返します。これを @<code>{FilterOperator} の上に配置することで、「WHEREで絞り込んでからSELECT列を取り出す」という論理的な順序が実行計画ツリー上で表現されます。
 
 ==== NestedLoopJoinOperator
 
-@<code>{NestedLoopJoinOperator}は左右の子Operatorから行を受け取り、ON条件を満たす組み合わせを返します。
+@<code>{NestedLoopJoinOperator} は左右の二つの子オペレータから行を受け取り、ON条件を満たす組み合わせを返します。
 
 //cmd{
 左の1行を取得
@@ -170,65 +168,15 @@ ON条件を評価 ── 不一致 ──▶ 右の次の行
 結合した1行を返す
 //}
 
-右側を最後まで調べたら、右のOperatorを開き直し、左の次の行との比較を始めます。第6章から使っているNested Loop Joinの考え方は変わりませんが、専用のOperatorにすることでQueryExecutorから結合処理を取り除けます。将来Hash Joinを追加する場合も、同じインターフェースで置き換えられます。
+右側を最後まで調べたら、右のオペレータを @<code>{close()} して @<code>{open()} し直し、左の次の行との比較を始めます。専用のオペレータにすることで、将来的に「Hash Join」などのより高速な結合アルゴリズムを追加する場合も、同じインターフェースで簡単に差し替えられます。
 
-== Plannerによる実行木の構築
+== 更新系オペレータの実装
 
-Operatorを分けるだけでは、どのOperatorをどの順番で接続するかは決まりません。PlannerがStatementとSchemaから実行木を作ることで、SQLの結果を保ったまま検索方法や処理順序を選択できます。
-
-==== 単一テーブルの実行木
-
-Plannerは、最初に実行木の葉となる走査方法を選びます。インデックスを利用できる場合はIndexScanOperator、それ以外はSeqScanOperatorです。
-
-//emlist[走査方法を選択する処理][java]{
-Operator plan;
-
-if (condition != null && isIndexable(schema, condition)) {
-  plan = new IndexScanOperator(
-      table, schema, statement.tableName(), condition);
-} else {
-  plan = new SeqScanOperator(table, schema, statement.tableName());
-}
-//}
-
-WHERE条件があればFilterOperatorを重ね、最後にProjectOperatorを重ねます。たとえば@<code>{SELECT name FROM users WHERE age >= 20}は、次の実行木になります。
-
-//cmd{
-ProjectOperator [name]
-        │
-FilterOperator [age >= 20]
-        │
-SeqScanOperator [users]
-//}
-
-Plannerが返すのは根のProjectOperatorだけです。根から子へ処理が伝わるため、QueryExecutorは実行木の内部構造を調べる必要がありません。
-
-==== JOINと条件のプッシュダウン
-
-JOINでは、WHERE条件をどこへ置くかによって比較する行数が変わります。条件が左テーブルだけを参照する場合は、NestedLoopJoinOperatorより下にFilterOperatorを置きます。これを@<b>{条件のプッシュダウン}と呼びます。
-
-//cmd{
-ProjectOperator
-        │
-NestedLoopJoinOperator
-        ├────────────────┐
-        │                │
-FilterOperator       SeqScanOperator [右テーブル]
-        │
-SeqScanOperator [左テーブル]
-//}
-
-先に左側の行を減らすことで、JOINが比較する組み合わせも減ります。右テーブルのカラムを参照する条件は結合前に評価できないため、NestedLoopJoinOperatorより上にFilterOperatorを置きます。
-
-この実装は単純な一つのConditionだけを対象としますが、Operatorの配置によって結果を変えずに処理量を減らせることを確認できます。
-
-== 更新系Operatorの実装
-
-SELECTだけをOperator化しても、INSERT、UPDATE、DELETEの個別処理がQueryExecutorに残れば、実行方法は統一されません。更新処理もOperatorにすることで、すべてのCRUD文をopen、next、closeで実行し、結果行や処理件数の数え方も共有できます。
+SELECTだけをオペレータ化しても、INSERT、UPDATE、DELETEの個別処理がクエリエグゼキュータに残っていては、アーキテクチャが統一されません。更新処理もオペレータにすることで、すべてのCRUDを @<code>{open}、@<code>{next}、@<code>{close} で実行し、処理件数の数え方なども共通化できます。
 
 ==== InsertOperator
 
-@<code>{InsertOperator}は、Statement.Insertの値をSchemaに従ってRowへ変換し、Tableへ挿入します。INSERTは1回だけ実行するため、executedフラグで二重実行を防ぎます。
+@<code>{InsertOperator} は、Statementの値をSchemaに従ってRowへ変換し、テーブルへ挿入します。INSERTは1回だけ実行すればよいため、@<code>{executed} フラグで二重実行を防ぎます。
 
 //emlist[一度だけ行を挿入するnext][java]{
 public Row next() throws IOException {
@@ -242,13 +190,13 @@ public Row next() throws IOException {
 }
 //}
 
-最初のnextは挿入したRowを返し、次のnextはnullを返します。
+最初の @<code>{next()} は挿入したRowを返し、次の @<code>{next()} は @<code>{null} を返します。
 
 ==== UpdateOperatorとDeleteOperator
 
-UpdateOperatorとDeleteOperatorは、RowとRecordIdの組を順番に取得し、ConditionEvaluatorでWHERE条件を評価します。UpdateOperatorは同じRecordIdへ変更後のRowを書き戻し、DeleteOperatorはRecordIdの使用フラグを変更します。
+更新や削除を行うためには、データの中身（Row）だけでなく、「物理的にディスクのどこにあるのか（RecordId）」という情報が必要です。そのため、子オペレータからRowを受け取る通常のイテレータモデルとは異なり、内部で直接 @<code>{Table.scanRecords()}（RowとRecordIdのペアを返す）を利用して処理を行います。
 
-//emlist[条件に一致した1行を更新する処理][java]{
+//emlist[条件に一致した1行を更新する処理（UpdateOperator）][java]{
 while (iterator != null && iterator.hasNext()) {
   Table.Record record = iterator.next();
   Row row = record.row();
@@ -258,6 +206,8 @@ while (iterator != null && iterator.hasNext()) {
     Object newValue =
         parseValue(statement.value(), targetColumn);
     row.put(targetColumn.name(), newValue);
+
+    // RecordIdを指定して上書き
     table.update(record.recordId(), row);
     return row;
   }
@@ -266,15 +216,64 @@ while (iterator != null && iterator.hasNext()) {
 return null;
 //}
 
-一致する行が複数あれば、nextが呼ばれるたびに1行ずつ処理します。Tableへ更新を委譲するため、第7章で実装したインデックスの同期処理もそのまま利用できます。
+一致する行が複数あれば、@<code>{next()} が呼ばれるたびに1行ずつ処理して結果を返します。テーブルオブジェクトへ更新を委譲するため、第7章で実装したインデックスの同期処理もそのまま利用されます。
 
-== QueryExecutorによるOperatorの実行
+== プランナによる実行計画ツリーの構築
 
-Plannerが実行木を作り、すべての処理がOperatorになったことで、QueryExecutorはSQLごとの検索方法や処理順序を持たずに済みます。その結果、新しいOperatorを追加しても共通の実行ループを再利用できます。
+オペレータという「部品」が揃いました。次はプランナ（Planner）がStatementとSchemaからこれらを組み立て、実行計画ツリーを作ります。
 
-CREATE TABLE以外のStatementはPlannerへ渡し、根のOperatorを取得します。
+==== 単一テーブルの実行計画ツリー
 
-//emlist[Plannerから根のOperatorを受け取る処理][java]{
+プランナは、最初に木の葉（一番下）となる走査方法を選びます。インデックスを利用できる場合は @<code>{IndexScanOperator}、それ以外は @<code>{SeqScanOperator} です。
+
+//emlist[走査方法を選択する処理][java]{
+Operator plan;
+
+if (condition != null && isIndexable(schema, condition)) {
+  plan = new IndexScanOperator(
+      table, schema, statement.tableName(), condition);
+} else {
+  plan = new SeqScanOperator(table, schema, statement.tableName());
+}
+//}
+
+WHERE条件があればその上に @<code>{FilterOperator} を重ね、最後に @<code>{ProjectOperator} を重ねます。たとえば @<code>{SELECT name FROM users WHERE age >= 20} は、次の実行計画ツリーになります。
+
+//cmd{
+ProjectOperator [name]
+        │
+FilterOperator [age >= 20]
+        │
+SeqScanOperator [users]
+//}
+
+プランナがクエリエグゼキュータに返すのは、根（トップ）の @<code>{ProjectOperator} だけです。根に @<code>{next()} を呼べば自動的に下へ処理が伝わるため、実行側は内部構造を一切気にする必要がありません。
+
+==== JOINと条件のプッシュダウン
+
+JOINでは、WHERE条件を「ツリーのどこに置くか」によってパフォーマンスが激変します。条件が左テーブルだけを参照する場合、@<code>{NestedLoopJoinOperator} よりも「下」に @<code>{FilterOperator} を置きます。これを@<b>{条件のプッシュダウン}と呼びます。
+
+//cmd{
+ProjectOperator
+        │
+NestedLoopJoinOperator
+        ├────────────────┐
+        │                │
+FilterOperator       SeqScanOperator [右テーブル]
+        │
+SeqScanOperator [左テーブル]
+//}
+
+結合（JOIN）の前に左側の行を減らしておくことで、比較する組み合わせの数が激減します。
+この実装は限定的ですが、オペレータの配置順序（実行計画）を変えるだけで、結果を変えずに処理量を劇的に減らせることが体験できます。
+
+== クエリエグゼキュータによるオペレータの実行
+
+プランナが実行計画ツリーを作り、すべての処理がオペレータに抽象化されたことで、クエリエグゼキュータはSQLごとの検索方法や処理順序を管理する必要がなくなりました。
+
+CREATE TABLE以外のStatementはすべてプランナへ渡し、根のオペレータを取得します。
+
+//emlist[プランナから根のオペレータを受け取る処理][java]{
 public void execute(Statement statement) throws IOException {
   if (statement instanceof Statement.CreateTable createTableStmt) {
     executeCreateTable(createTableStmt);
@@ -285,9 +284,9 @@ public void execute(Statement statement) throws IOException {
 }
 //}
 
-実行時はopenを呼び、nextがnullを返すまでRowを受け取ります。最後に必ずcloseを呼べるように、終了処理をfinallyへ置きます。
+実行時は @<code>{open()} を呼び、@<code>{next()} が @<code>{null} を返すまでループでRowを受け取り続けます。最後に必ず @<code>{close()} を呼べるように、終了処理をfinallyブロックへ置きます。
 
-//emlist[Operatorを実行する共通ループ][java]{
+//emlist[オペレータを実行する共通ループ][java]{
 private void executePlan(
     Operator rootPlan, Statement statement) throws IOException {
   rootPlan.open();
@@ -312,11 +311,11 @@ private void executePlan(
 }
 //}
 
-SELECTではRowを表示し、UPDATEとDELETEではnextが返した回数を処理件数として表示します。QueryExecutorがOperatorの種類を判定しないことが、実行処理を再利用できる理由です。
+SELECTではRowを表示し、UPDATEとDELETEでは @<code>{next()} が返した回数を処理件数として表示します。クエリエグゼキュータが「今何のオペレータを動かしているのか」を一切意識しないことが、イテレータモデルの最大の利点です。
 
 == 実行結果の確認
 
-本章の変更はデータベース内部の構造を整理するものであり、利用者が入力するSQLや結果は第7章から変わりません。
+本章の変更はデータベース内部のアーキテクチャを整理するものであり、利用者が入力するSQLやその結果は第7章から変わりません。
 
 //cmd{
 db > SELECT name FROM users WHERE age >= 20;
@@ -329,11 +328,11 @@ db > DELETE FROM users WHERE id = 2;
 Deleted 1 row(s).
 //}
 
-SELECTは走査、絞り込み、射影をつないだ実行木で処理され、UPDATEとDELETEは共通の実行ループで件数を数えます。外部のインターフェースを保ったまま内部構造を変更できたことは、Parser、Planner、Operator、Tableの責務が分離されていることを示します。
+SELECTは走査、絞り込み、射影をつないだ実行計画ツリーで処理され、UPDATEとDELETEは共通の実行ループで件数がカウントされます。外部のインターフェースを保ったまま内部構造を劇的に変更できたことは、コンポーネントの責務が美しく分離されている証拠です。
 
-== 本章のまとめ：構造の分離と残る課題
+== まとめと次章への課題
 
-第1章では、完成時のデータベースをフロントエンド層、実行処理層、ストレージ層に分けました。本章のOperator導入により、実装上のクラスもこの役割へ対応します。
+第1章では、データベース全体をフロントエンド層、実行処理層、ストレージ層に分けました。本章のオペレータ導入により、実装上のクラスが見事にこの役割へと対応しました。
 
 //cmd{
 ユーザーのSQL
@@ -354,20 +353,22 @@ Catalog・Schema・Table・Index
 .tblファイル・catalog.txt
 //}
 
-ParserはSQLをStatementへ変換し、PlannerはOperatorを組み合わせます。QueryExecutorは実行木の根を共通の方法で動かし、TableとIndexは行の保存と検索に集中します。この分離により、検索方法や結合方法を追加するときも、変更する範囲を対応するOperatorとPlannerへ限定できます。
+構文解析がSQLをASTへ変換し、プランナがオペレータを組み合わせます。クエリエグゼキュータは実行計画ツリーを共通の方法で動かし、テーブルとインデックスは行の保存と検索に集中します。
 
-一方、現在のSeqScanOperatorはopenで@<code>{Table.scan()}を呼び出し、その戻り値であるList<Row>を使用します。UpdateOperatorとDeleteOperatorも@<code>{Table.scanRecords()}が作る一覧を使用します。上位のOperator間では1行ずつ受け渡しますが、ストレージからの読み込みまで完全にストリーミング化されたわけではありません。
+一方、本章の冒頭で提起した「メモリ枯渇問題」は、実はまだ完全に解決していません。
+現在の @<code>{SeqScanOperator} の実装を振り返ると、@<code>{open()} の中で @<code>{Table.scan()} を呼び出し、その戻り値である巨大な @<code>{List<Row>} をイテレータに変換して使用しています。上位のオペレータ間では1行ずつ受け渡す美しいバケツリレーが完成しましたが、「一番底のストレージからの読み込み」は一括読み込みのままなのです。
 
-完全に1行ずつ処理するには、Table側にもページとスロットを順に読むCursorが必要です。
+これを完全に1行ずつ処理（ストリーミング化）し、真の意味でメモリ消費を抑えるには、Table側にページとスロットを順に1件ずつ読み進める「Cursor（カーソル）」という仕組みを実装する必要があります。
 
 //cmd{
 現在
-Table.scan() ──▶ List<Row> ──▶ SeqScanOperator.next()
+Table.scan() ──(一括)──▶ List<Row> ──▶ SeqScanOperator.next()
 
-今後の拡張例
-Table Cursor ── 1行ずつ ──▶ SeqScanOperator.next()
+真のストリーミング化（今後の課題）
+Table Cursor ──(1行ずつ)──▶ SeqScanOperator.next()
 //}
 
-また、本章のPlannerが行う最適化は、インデックス走査の選択と限定的な条件のプッシュダウンだけです。実際のデータベースでは、統計情報を使ったコスト推定、JOIN順序の変更、SortやAggregateなど、さらに多くの処理が必要になります。
+また、本章のプランナが行う最適化は、インデックス走査の選択と限定的なプッシュダウンだけです。実際の商用データベースでは、統計情報を使ったコスト推定（CBO）、JOIN順序の動的変更、SortやAggregateなど、さらに多くの複雑な処理が行われています。
 
-本章では、それらをOperatorとして追加し、Plannerで組み合わせるための土台を作りました。次章では、最小のデータベースからここまでに追加した仕組みを振り返り、実用的なデータベースとの差と今後の発展を整理します。
+本章では、それらを新たなオペレータとして追加し、自由に組み合わせるための「強力な土台」を完成させました。
+次章（第9章）では、最小のデータベースからここまでに追加してきた仕組み全体を振り返り、本物の実用的なデータベースシステムに到達するために残された機能と、今後の発展について整理します。
