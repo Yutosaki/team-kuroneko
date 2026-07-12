@@ -37,7 +37,7 @@
 まずは、データベースを保存するファイルを決めます。
 本書では、プロジェクト内のdataディレクトリにデータベースファイルを配置します。
 
-//emlist{
+//cmd{
 project
 ├── src
 └── data
@@ -85,12 +85,12 @@ if (!Files.exists(dataPath.getParent())) {
 現在のデータベースでは、レコードはHashMap<Integer, String>に保存されています。
 例えば、次のようなデータが登録されているとします。
 
-//emlist{
-| ID | Name  |
-| -- | ----- |
-| 1  | Alice |
-| 2  | Bob   |
-| 3  | Carol |
+//table[IDとNameのペア][IDとNameのペア]{
+ID	Name
+-------------------------------------------------------------
+1	Alice
+2	Bob
+3	Carol
 //}
 
 メモリ上では、
@@ -216,7 +216,7 @@ saveToFile();
 
 まずはデータベースを起動し、いくつかのレコードを登録します。
 
-//emlist{
+//cmd{
 db > insert 1 Alice
 db > insert 2 Bob
 //}
@@ -234,7 +234,7 @@ db > insert 2 Bob
 
 次に、データベースを終了します。
 
-//emlist{
+//cmd{
 db > exit
 //}
 
@@ -242,13 +242,13 @@ db > exit
 その後、再びデータベースを起動します。
 起動後に、
 
-//emlist{
+//cmd{
 db > select
 //}
 
 を実行すると、
 
-//emlist{
+//cmd{
 (1,Alice)
 (2,Bob)
 //}
@@ -267,7 +267,7 @@ db > select
 現在のsaveToFile()では、データが1件だけ変更された場合でも、データベースファイル全体を書き直しています。
 例えば、100万件のレコードが保存されている状態で、
 
-//emlist{
+//cmd{
 db > update 100 Robert
 //}
 
