@@ -32,7 +32,7 @@
 
 本章では、全件走査を表す@<code>{SeqScanPlan}と、インデックス検索を表す@<code>{IndexScanPlan}の2種類の実行計画（プラン）を用意します。システム全体の流れは以下のようになります。
 
-//image[chapter07_image01][][scale=0.3]{
+//image[chapter07_image01][][scale=0.5]{
 //}
 
 
