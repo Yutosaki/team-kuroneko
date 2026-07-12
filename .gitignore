@@ -1,6 +1,7 @@
 node_modules/
 Gemfile.lock
 *.pdf
+!images/*.pdf
 .sass-cache/
 
 !articles/*.pdf
