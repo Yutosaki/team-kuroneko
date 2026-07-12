@@ -158,6 +158,9 @@ public class nekoDB {
       String[] tokens = parser.parse(scanner.nextLine());
       String command = parser.getCommand(tokens);
 
+      // --- 計測開始 ---
+      long startTime = System.nanoTime();
+
       if (command.isEmpty()) {
         continue;
       } else if (command.equals("insert") && tokens.length == 3) {
@@ -175,6 +178,11 @@ public class nekoDB {
       } else {
         System.out.println("Unknown command");
       }
+
+      // --- 計測終了 ---
+      long endTime = System.nanoTime();
+      double timeMs = (endTime - startTime) / 1_000_000.0;
+      System.out.printf("(Executed in %.3f ms)\n", timeMs);
     }
   }
 }
