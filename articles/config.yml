@@ -30,10 +30,10 @@ booktitle:
 # 著者名。「, 」で区切って複数指定できる
 aut:
   [
-    { name: "久保", file-as: "kubo" },
-    { name: "小林", file-as: "kobayashi" },
+    { name: "久保友樹", file-as: "kubo" },
+    { name: "小林龍生", file-as: "kobayashi" },
     { name: "佐佐木悠人", file-as: "sasaki yuto" },
-    { name: "白根", file-as: "shirane" },
+    { name: "白根薫", file-as: "shirane" },
   ]
 # 以下はオプション
 # 以下はオプション(autと同じように配列書式で複数指定可能)。
@@ -64,7 +64,8 @@ edt: ["mhidaka"]
 # a-oth, oth: その他
 # a-pht, pht: 撮影責任者
 # a-pbl, pbl: 出版社（発行所）
-pbl: TechBooster
+# pbl: TechBooster
+pbl: くろねこチーム
 # a-prt, prt: 印刷所
 # prt: TechBooster
 # a-red, red: 項目の枠組起草者
@@ -134,11 +135,11 @@ toc: true
 # mytoc: true
 
 # 表紙にするファイル。ファイル名を指定すると表紙として入る (PDFMaker向けにはLaTeXソース断片、EPUBMaker向けにはHTMLファイル)
-# cover: null
+# cover: cover_a.png
 #
 # 表紙に配置し、書籍の影絵にも利用する画像ファイル。省略した場合はnull (画像を使わない)。画像ディレクトリ内に置いてもディレクトリ名は不要(例: cover.jpg)
 # PDFMaker 固有の表紙設定は pdfmaker セクション内で上書き可能
-coverimage: cover_a.png
+# coverimage: cover_a.png
 #
 # 表紙の後に大扉ページを作成するか。省略した場合はtrue (作成する)
 titlepage: true
@@ -380,13 +381,13 @@ texstyle: ["reviewmacro"]
 # hiddenfolio=nikko-pcは日光企画向けのノドへの隠しノンブル配置
 #
 # B5の設定(10pt 40文字×35行) - 紙版
-texdocumentclass:
-  [
-    "review-jsbook",
-    "media=print,paper=b5,serial_pagination=true,hiddenfolio=nikko-pc,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm",
-  ]
+# texdocumentclass:
+#   [
+#     "review-jsbook",
+#     "media=print,paper=b5,serial_pagination=true,hiddenfolio=nikko-pc,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm,cover_fit_page=true",
+#   ]
 # B5の設定(10pt 40文字×35行) - 電子版
-# texdocumentclass: ["review-jsbook", "media=ebook,paper=b5,serial_pagination=true,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm"]
+texdocumentclass: ["review-jsbook", "media=ebook,paper=b5,serial_pagination=true,openany,fontsize=10pt,baselineskip=15.4pt,line_length=40zw,number_of_lines=35,head_space=30mm,headsep=10mm,headheight=5mm,footskip=10mm"]
 # A5の設定(9pt 38文字×37行) - 紙版
 # texdocumentclass: ["review-jsbook", "media=print,paper=a5,serial_pagination=true,hiddenfolio=nikko-pc,openany,fontsize=9pt,baselineskip=13pt,line_length=38zw,number_of_lines=37,head_space=15mm,headsep=3mm,headheight=5mm,footskip=10mm"]
 # A5の設定(9pt 38文字×37行) - 電子版
@@ -417,7 +418,7 @@ pdfmaker:
   # 仕上がりサイズ+塗り足し3mmありのPDFまたはIllustratorファイル（PDF互換オプション付き）を推奨。
   # 拡縮はされず「そのまま」貼り付けられる
   # 原寸画像を用意できないときには、「,cover_fit_page=true」をtexdocumentclassパラメータの2つめの値に追加すると、仕上がりサイズにリサイズして貼り付ける
-  coverimage: cover_a.png
+  coverimage: cover_title.png
   #
   # TeXコンパイル前に実行するプログラム。変換後のTeXソースを調整したいときに使用する。
   # 渡される引数1=作業用展開ディレクトリ、引数2=呼び出しを実行したディレクトリ
@@ -497,6 +498,6 @@ webmaker:
 techbooster:
   # 表紙および裏表紙を実寸ではなく仕上がりサイズにリサイズするか
   # texdocumentclassでcover_fit_page=trueを付けるのと同じ
-  # cover_fit_page: true
+  cover_fit_page: true
   # 裏表紙画像指定。画像はimages/から探索される
-  # backcoverimage: backcover.jpg
+  backcoverimage: cover_back.png
