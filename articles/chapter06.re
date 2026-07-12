@@ -409,7 +409,7 @@ private void expect(List<String> tokens, int index, String expected) {
 }
 //}
 
-キーワードは大文字と小文字を区別せず照合します。想定したトークンがなければ解析を継続せずIllegalArgumentExceptionを送出するため、不完全なStatementがQueryExecutorへ渡ることはありません。
+キーワードは大文字と小文字を区別せず照合します。想定したトークンがなければ解析を継続せずIllegalArgumenItExceptionを送出するため、不完全なStatementがQueryExecutorへ渡ることはありません。
 
 ==== ASTの表現（Statement）
 
