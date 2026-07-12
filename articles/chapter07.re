@@ -32,26 +32,9 @@
 
 本章では、全件走査を表す@<code>{SeqScanPlan}と、インデックス検索を表す@<code>{IndexScanPlan}の2種類の実行計画（プラン）を用意します。システム全体の流れは以下のようになります。
 
-//cmd{
-Statement.Select ＋ Schema
-        │
-        ▼
-   プランナ（Planner）
-        │
-   ┌────┴────┐
-   ▼         ▼
-IndexScanPlan  SeqScanPlan
-   │         │
-   └────┬────┘
-        ▼
-   Plan.execute()
-        │
-        ▼
-クエリエグゼキュータ（QueryExecutor）
-        │
-        ▼
-    結果を表示
+//image[chapter07_image01][][scale=0.3]{
 //}
+
 
 第6章では@<code>{QueryExecutor.executeSelect()}が直接テーブルを走査していましたが、本章からはプランナにプラン（計画）を作成させ、エグゼキュータはそのプランをただ実行するだけの流れに変更します。
 

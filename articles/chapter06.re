@@ -43,35 +43,9 @@ CREATE TABLE orders (
 SQLの解析からデータの読み書きまでを一つの処理にまとめると、各クラスの役割や処理の境界が分かりにくくなります。
 そこで本節では、SQLを入力してから結果を表示するまでの流れを示し、後続の節で実装する各要素の役割を整理します。
 
-//cmd{
-SQL文字列
-    │
-    ▼
-字句解析（Tokenizer）
-SQL文字列をトークン列へ分割
-    │
-    ▼
-構文解析（SimpleParser）
-トークンの並びからSQLの構造を読み取る
-    │
-    ▼
-AST（Statement）
-SQLの内容をJavaの値として保持
-    │
-    ▼
-クエリ実行（QueryExecutor）
-Statementの種類に応じて処理を選択
-    │
-    ▼
-Catalog ── Schema
-    │         テーブルの構造を提供
-    ▼
-Table ─── Row
-ページファイルを読み書き
-    │
-    ▼
-実行結果または更新件数を表示
+//image[chapter06_image01][][scale=0.5]{
 //}
+
 
 @<code>{nekoDB.start()}は、REPLで一行ずつSQLを受け取ります。REPLの入力ループとコマンド実行の基本構造は、第2章「対話型プログラム（REPL）の作成」と「入力とコマンドの扱い」で説明しています。本章では、SQLに対して字句解析と構文解析を行い、ASTへ変換します。実装では@<code>{SimpleParser.parseStatement()}がこの解析処理の入口となり、生成した@<code>{Statement}を@<code>{QueryExecutor.execute()}へ渡します。
 
@@ -685,21 +659,9 @@ Rowが完成すると、TableはSchemaのカラム順に値を直列化します
 
 SELECTでは、FROM句のTableに対して@<code>{scan()}を呼び出します。WHERE条件がある場合は、各Rowに対して@<code>{matches()}を実行し、一致した行だけを残します。その後、SELECT句に指定されたカラムだけを@<code>{projectRow()}で取り出します。
 
-//cmd{
-Table.scan()
-    │
-    ▼
-JOINがあれば行を結合
-    │
-    ▼
-WHERE条件を評価
-    │
-    ▼
-SELECT列を射影
-    │
-    ▼
-結果を表示
+//image[chapter06_image03][][scale=0.5]{
 //}
+
 
 JOINがある場合は、左側の各行に対して右側のTableを走査するNested Loop Joinを実行します。カラム名の衝突を避けるため、結合中のRowでは@<code>{users.id}のようにテーブル名を付けます。
 
@@ -808,18 +770,8 @@ REPLは成功時とエラー時のどちらでも、結果に続けて@<code>{(E
 
 SQLの解析結果とSchemaを参照し、最適な実行方法を決める役割がプランナ（Planner）です。たとえば、インデックスが設定された整数カラムに対する等価条件ならインデックス走査を選び、それ以外なら逐次走査を選ぶ、という判断を行います。
 
-//cmd{
-AST（Statement.Select）+ Schema
-          │
-          ▼
-       Planner
-       条件を確認
-          │
-      ┌────┴────┐
-      ▼         ▼
-Index Scan    Seq Scan
-インデックス  全件走査
-を利用
+//image[chapter06_image04][][scale=0.5]{
 //}
+
 
 本章のクエリ実行には、このPlannerがまだありません。次章（第7章）では、AST（Statement）から実行計画を作り、条件に応じてインデックス走査と全件走査を選択する仕組みを実装し、再び高速な検索を取り戻します。
