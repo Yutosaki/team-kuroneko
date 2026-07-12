@@ -30,11 +30,13 @@
 SELECT name FROM users WHERE age >= 20;
 //}
 
+//noindent
 このSQLは、全件走査、条件による絞り込み、カラムの取り出しというオペレータをつないだ「実行計画ツリー」で表せます。
 
 //image[chapter08_image01][][scale=0.5]{
 //}
 
+//noindent
 クエリエグゼキュータが根（トップ）の @<code>{ProjectOperator} へ行を要求すると、要求は @<code>{FilterOperator}、@<code>{SeqScanOperator} の順に下へ伝わります。一番下の @<code>{SeqScanOperator} が返した行を @<code>{FilterOperator} が判定し、条件を満たした行だけを @<code>{ProjectOperator} が @<code>{{name=Taro}} のような結果へ変換して上に返します。
 
 すべてのオペレータを同じ方法で扱うため、次のインターフェースを定義します。
@@ -49,6 +51,7 @@ public interface Operator {
 }
 //}
 
+//noindent
 @<code>{open()} は処理の準備、@<code>{next()} は次の1行の取得、@<code>{close()} は終了処理を担当します。返せる行がなくなると @<code>{next()} は @<code>{null} を返します。
 
 この約束を守れば、全件走査でもインデックス走査でも、呼び出し側から見た実行方法は変わりません。本章では、行を読み出す @<code>{SeqScanOperator} と @<code>{IndexScanOperator}、行を加工する @<code>{FilterOperator}、@<code>{ProjectOperator}、@<code>{NestedLoopJoinOperator}、データを変更する @<code>{InsertOperator}、@<code>{UpdateOperator}、@<code>{DeleteOperator} を順に実装していきます。
@@ -80,6 +83,7 @@ public void close() throws IOException {
 }
 //}
 
+//noindent
 @<code>{qualifyRow()} は、カラム名（id）をテーブル名付き（users.id）に変換してRowへ登録する処理です。これにより、単一テーブルでは短いカラム名を使いつつ、JOIN時には同名カラムをテーブル名で区別できるようになります。
 
 ==== IndexScanOperator
@@ -102,6 +106,7 @@ public void open() throws IOException {
 }
 //}
 
+//noindent
 @<code>{next()} と @<code>{close()} は @<code>{SeqScanOperator} と同じ形です。そのため、上位のオペレータはどちらの走査方法が使われているかを一切意識しません。
 
 == 行を加工するオペレータの実装
@@ -126,6 +131,7 @@ public Row next() throws IOException {
 }
 //}
 
+//noindent
 条件評価は @<code>{ConditionEvaluator} という別クラスへ分離します。第6章ではクエリエグゼキュータ内にあった比較処理を独立させることで、@<code>{FilterOperator} だけでなく後述の更新系オペレータ等からも同じ判定ロジックを利用できます。
 
 ==== ProjectOperator
@@ -142,6 +148,7 @@ public Row next() throws IOException {
 }
 //}
 
+//noindent
 SELECT句が @<code>{*} なら全カラムを返し、カラム名が指定されていれば該当する値だけを抽出して返します。これを @<code>{FilterOperator} の上に配置することで、「WHEREで絞り込んでからSELECT列を取り出す」という論理的な順序が実行計画ツリー上で表現されます。
 
 ==== NestedLoopJoinOperator
@@ -173,6 +180,7 @@ public Row next() throws IOException {
 }
 //}
 
+//noindent
 最初の @<code>{next()} は挿入したRowを返し、次の @<code>{next()} は @<code>{null} を返します。
 
 ==== UpdateOperatorとDeleteOperator
@@ -199,6 +207,7 @@ while (iterator != null && iterator.hasNext()) {
 return null;
 //}
 
+//noindent
 一致する行が複数あれば、@<code>{next()} が呼ばれるたびに1行ずつ処理して結果を返します。テーブルオブジェクトへ更新を委譲するため、第7章で実装したインデックスの同期処理もそのまま利用されます。
 
 == プランナによる実行計画ツリーの構築
@@ -230,6 +239,7 @@ FilterOperator [age >= 20]
 SeqScanOperator [users]
 //}
 
+//noindent
 プランナがクエリエグゼキュータに返すのは、根（トップ）の @<code>{ProjectOperator} だけです。根に @<code>{next()} を呼べば自動的に下へ処理が伝わるため、実行側は内部構造を一切気にする必要がありません。
 
 ==== JOINと条件のプッシュダウン
@@ -259,6 +269,7 @@ public void execute(Statement statement) throws IOException {
 }
 //}
 
+//noindent
 実行時は @<code>{open()} を呼び、@<code>{next()} が @<code>{null} を返すまでループでRowを受け取り続けます。最後に必ず @<code>{close()} を呼べるように、終了処理をfinallyブロックへ置きます。
 
 //emlist[オペレータを実行する共通ループ][java]{
@@ -286,6 +297,7 @@ private void executePlan(
 }
 //}
 
+//noindent
 SELECTではRowを表示し、UPDATEとDELETEでは @<code>{next()} が返した回数を処理件数として表示します。クエリエグゼキュータが「今何のオペレータを動かしているのか」を一切意識しないことが、イテレータモデルの最大の利点です。
 
 == 実行結果の確認
@@ -303,6 +315,7 @@ db > DELETE FROM users WHERE id = 2;
 Deleted 1 row(s).
 //}
 
+//noindent
 SELECTは走査、絞り込み、射影をつないだ実行計画ツリーで処理され、UPDATEとDELETEは共通の実行ループで件数がカウントされます。外部のインターフェースを保ったまま内部構造を劇的に変更できたことは、コンポーネントの責務が美しく分離されている証拠です。
 
 == まとめと次章への課題
